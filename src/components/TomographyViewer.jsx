@@ -82,11 +82,12 @@ const TomographyViewer = () => {
       const loader = new STLLoader();
       const geometry = await loader.loadAsync(url);
       
-      // Create mesh with a nice material
+      // Create mesh with a theme-matching material
       const material = new THREE.MeshPhongMaterial({
-        color: 0x00ff00,
-        specular: 0x111111,
-        shininess: 200,
+        color: '#268bd2',      // Solarized blue
+        specular: '#6c71c4',   // Solarized violet for highlights
+        shininess: 100,
+        flatShading: true,
       });
       
       // Update the mesh state
@@ -108,7 +109,7 @@ const TomographyViewer = () => {
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
+    scene.background = new THREE.Color('#eee8d5'); // Theme background color
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(75, modelRef.current.clientWidth / modelRef.current.clientHeight, 0.1, 1000);
@@ -121,14 +122,14 @@ const TomographyViewer = () => {
     modelRef.current.appendChild(renderer.domElement);
 
     // Add lights
-    const ambientLight = new THREE.AmbientLight(0x404040);
+    const ambientLight = new THREE.AmbientLight('#fdf6e3', 0.6);
     scene.add(ambientLight);
 
-    const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    const light1 = new THREE.DirectionalLight('#fdf6e3', 0.8);
     light1.position.set(1, 1, 1);
     scene.add(light1);
 
-    const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    const light2 = new THREE.DirectionalLight('#93a1a1', 0.5);
     light2.position.set(-1, -1, -1);
     scene.add(light2);
 
@@ -172,27 +173,22 @@ const TomographyViewer = () => {
   }, [mesh, modelRef]);
 
   return (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      overflow: 'hidden',
-      p: 2
-    }}>
-      {/* Controls */}
-      <Box sx={{ mb: 2 }}>
-        <input
-          accept=".nii,.nii.gz"
-          style={{ display: 'none' }}
-          id="tomography-file"
-          type="file"
-          onChange={handleFileUpload}
-        />
-        <label htmlFor="tomography-file">
-          <Button variant="contained" component="span" sx={{ mr: 2 }}>
-            Upload Tomography Data
-          </Button>
-        </label>
+    <Box sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column' }}>
+      {/* Top Controls */}
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Button
+          variant="contained"
+          component="label"
+          disabled={processing}
+        >
+          Upload File
+          <input
+            type="file"
+            hidden
+            onChange={handleFileUpload}
+            accept=".nii,.nii.gz,.dicom,.dcm"
+          />
+        </Button>
         <Button
           variant="outlined"
           onClick={async () => {
@@ -207,119 +203,173 @@ const TomographyViewer = () => {
               console.error('Error loading sample data:', error);
             }
           }}
-          sx={{ mr: 2 }}
+          disabled={processing}
         >
           Load Sample Data
         </Button>
-        {fileId && (
-          <Button
-            variant="contained"
-            onClick={processTomography}
-            disabled={processing}
-            color="secondary"
-          >
-            {processing ? 'Processing...' : 'Generate 3D Model'}
-          </Button>
-        )}
+        <Button
+          variant="contained"
+          onClick={processTomography}
+          disabled={!fileId || processing}
+        >
+          Generate 3D Model
+        </Button>
       </Box>
 
-      {/* Content */}
+      {/* Main Content */}
       <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
         {/* Left side - Slices */}
-        <Grid item xs={6} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {/* Axial View */}
-          <Box sx={{ flex: 1, minHeight: 0, mb: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Axial View (Slice {axialSlice})
-            </Typography>
-            <Box sx={{ 
-              height: 'calc(50% - 30px)', 
-              border: '1px solid #ccc',
-              borderRadius: 1,
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'background.paper'
-            }}>
-              {axialImage ? (
-                <img
-                  src={axialImage}
-                  alt="Axial slice"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              ) : (
-                <Typography color="text.secondary">
-                  {fileId ? 'Loading...' : 'Upload a file to view slices'}
+        <Grid item xs={6} sx={{ height: '100%' }}>
+          <Box sx={{ 
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            {/* Axial View */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <Box sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="subtitle1">
+                  Axial View
                 </Typography>
-              )}
+                <Typography variant="body2" color="text.secondary">
+                  Slice: {axialSlice}
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                flex: 1,
+                position: 'relative',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                overflow: 'hidden',
+                bgcolor: 'background.paper',
+                minHeight: 0
+              }}>
+                <Box sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {axialImage ? (
+                    <img
+                      src={axialImage}
+                      alt="Axial slice"
+                      style={{ 
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <Typography color="text.secondary">
+                      {fileId ? 'Loading...' : 'Upload a file to view slices'}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                <Slider
+                  value={axialSlice}
+                  onChange={(_, value) => setAxialSlice(value)}
+                  min={0}
+                  max={dimensions[0] - 1}
+                  disabled={!fileId}
+                  valueLabelDisplay="auto"
+                  size="small"
+                />
+              </Box>
             </Box>
-            <Box sx={{ px: 1, mt: 1 }}>
-              <Slider
-                value={axialSlice}
-                onChange={(_, value) => setAxialSlice(value)}
-                min={0}
-                max={dimensions[0] - 1}
-                disabled={!fileId}
-                valueLabelDisplay="auto"
-                size="small"
-              />
-            </Box>
-          </Box>
 
-          {/* Coronal View */}
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Coronal View (Slice {coronalSlice})
-            </Typography>
-            <Box sx={{ 
-              height: 'calc(50% - 30px)',
-              border: '1px solid #ccc',
-              borderRadius: 1,
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'background.paper'
-            }}>
-              {coronalImage ? (
-                <img
-                  src={coronalImage}
-                  alt="Coronal slice"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              ) : (
-                <Typography color="text.secondary">
-                  {fileId ? 'Loading...' : 'Upload a file to view slices'}
+            {/* Coronal View */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <Box sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="subtitle1">
+                  Coronal View
                 </Typography>
-              )}
-            </Box>
-            <Box sx={{ px: 1, mt: 1 }}>
-              <Slider
-                value={coronalSlice}
-                onChange={(_, value) => setCoronalSlice(value)}
-                min={0}
-                max={dimensions[1] - 1}
-                disabled={!fileId}
-                valueLabelDisplay="auto"
-                size="small"
-              />
+                <Typography variant="body2" color="text.secondary">
+                  Slice: {coronalSlice}
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                flex: 1,
+                position: 'relative',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                overflow: 'hidden',
+                bgcolor: 'background.paper',
+                minHeight: 0
+              }}>
+                <Box sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {coronalImage ? (
+                    <img
+                      src={coronalImage}
+                      alt="Coronal slice"
+                      style={{ 
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                    />
+                  ) : (
+                    <Typography color="text.secondary">
+                      {fileId ? 'Loading...' : 'Upload a file to view slices'}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                <Slider
+                  value={coronalSlice}
+                  onChange={(_, value) => setCoronalSlice(value)}
+                  min={0}
+                  max={dimensions[1] - 1}
+                  disabled={!fileId}
+                  valueLabelDisplay="auto"
+                  size="small"
+                />
+              </Box>
             </Box>
           </Box>
         </Grid>
 
         {/* Right side - 3D View */}
         <Grid item xs={6} sx={{ height: '100%' }}>
-          <Typography variant="subtitle1" gutterBottom>
-            3D Model
-          </Typography>
           <Box sx={{ 
-            height: 'calc(100% - 24px)',
-            border: '1px solid #ccc',
-            borderRadius: 1,
-            overflow: 'hidden',
-            bgcolor: 'background.paper'
-          }} ref={modelRef}>
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              3D Model
+            </Typography>
+            <Box sx={{ 
+              flex: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              overflow: 'hidden',
+              bgcolor: 'background.paper',
+              minHeight: 0
+            }} ref={modelRef}>
+            </Box>
           </Box>
         </Grid>
       </Grid>
