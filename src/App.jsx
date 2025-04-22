@@ -15,12 +15,19 @@ export default function ReplicadApp() {
   const [leftActiveTab, setLeftActiveTab] = useState(0);
   const [rightActiveTab, setRightActiveTab] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState(null);
 
   // Gyroid parameters
   const [gyroidMode, setGyroidMode] = useState('volume');
   const [period, setPeriod] = useState(1.5);
   const [thickness, setThickness] = useState(0.2);
   const [resolution, setResolution] = useState(60);
+
+  // Reset error when parameters change
+  useEffect(() => {
+    setError(null);
+  }, [gyroidMode, period, thickness, resolution]);
 
   const downloadModel = async () => {
     const blob = await cad.createBlob(size);
@@ -30,22 +37,30 @@ export default function ReplicadApp() {
   const generateGyroidModel = async () => {
     try {
       setIsProcessing(true);
+      setProgress(0);
+      setError(null);
+      
       // Get the current model as STL
       const stlBlob = await cad.createBlob(size);
       
-      // Generate gyroid
+      // Generate gyroid with progress callback
       const gyroidBlob = await generateGyroid(stlBlob, {
         mode: gyroidMode,
         period,
         thickness,
-        resolution
+        resolution,
+        onProgress: (progress) => {
+          setProgress(progress);
+          console.log('Progress:', Math.round(progress * 100) + '%');
+        }
       });
 
       // Save the file
       FileSaver.saveAs(gyroidBlob, "gyroid_model.stl");
+      setProgress(1); // Show 100% completion
     } catch (error) {
       console.error('Error generating gyroid:', error);
-      alert('Failed to generate gyroid model. Please try again.');
+      setError(error.message || 'Failed to generate gyroid model');
     } finally {
       setIsProcessing(false);
     }
@@ -95,6 +110,19 @@ export default function ReplicadApp() {
       <div style={{ marginTop: '1rem' }}>
         <h3 style={{ marginBottom: '1rem' }}>Gyroid Parameters</h3>
         
+        {error && (
+          <div style={{
+            padding: '0.75rem',
+            marginBottom: '1rem',
+            backgroundColor: '#f8d7da',
+            color: '#721c24',
+            borderRadius: '4px',
+            border: '1px solid #f5c6cb'
+          }}>
+            {error}
+          </div>
+        )}
+        
         <div style={{ marginBottom: '2rem' }}>
           <label style={{ 
             display: 'block', 
@@ -125,6 +153,20 @@ export default function ReplicadApp() {
           </select>
         </div>
 
+        {gyroidMode === 'surface' && (
+          <div style={{
+            padding: '0.75rem',
+            marginBottom: '1rem',
+            backgroundColor: '#cce5ff',
+            color: '#004085',
+            borderRadius: '4px',
+            border: '1px solid #b8daff',
+            fontSize: '0.9em'
+          }}>
+            Surface mode requires higher resolution for good quality. Resolution will be automatically adjusted to minimum 80.
+          </div>
+        )}
+        
         <div style={{ marginBottom: '2rem' }}>
           <label style={{ 
             display: 'block', 
@@ -233,36 +275,60 @@ export default function ReplicadApp() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: 'auto', padding: '1rem 0' }}>
-        <button 
-          onClick={downloadModel}
-          style={{
-            flex: 1,
-            padding: '0.5rem 1rem',
-            backgroundColor: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Download Base STL
-        </button>
-        <button 
-          onClick={generateGyroidModel}
-          disabled={isProcessing}
-          style={{
-            flex: 1,
-            padding: '0.5rem 1rem',
-            backgroundColor: isProcessing ? '#ccc' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {isProcessing ? 'Generating...' : 'Generate Gyroid'}
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', padding: '1rem 0' }}>
+        {isProcessing && (
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '0.5rem', fontSize: '0.9em', color: '#666' }}>
+              Generating gyroid pattern: {Math.round(progress * 100)}%
+            </div>
+            <div style={{ 
+              width: '100%', 
+              height: '4px', 
+              backgroundColor: '#e9ecef',
+              borderRadius: '2px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${progress * 100}%`,
+                height: '100%',
+                backgroundColor: '#007bff',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+        )}
+        
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            onClick={downloadModel}
+            style={{
+              flex: 1,
+              padding: '0.5rem 1rem',
+              backgroundColor: '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Download Base STL
+          </button>
+          <button 
+            onClick={generateGyroidModel}
+            disabled={isProcessing}
+            style={{
+              flex: 1,
+              padding: '0.5rem 1rem',
+              backgroundColor: isProcessing ? '#ccc' : '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isProcessing ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isProcessing ? `Generating (${Math.round(progress * 100)}%)` : 'Generate Gyroid'}
+          </button>
+        </div>
       </div>
     </div>
   );

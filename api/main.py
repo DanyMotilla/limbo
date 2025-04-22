@@ -12,7 +12,7 @@ import gc
 import psutil
 from typing import Optional, Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
-from scipy.ndimage import binary_fill_holes
+from scipy.ndimage import binary_fill_holes, binary_dilation
 from skimage import measure
 import asyncio
 import contextlib
@@ -81,24 +81,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # CORS configuration
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
-]
-
-if os.getenv("ENVIRONMENT") != "production":
-    ALLOWED_ORIGINS.extend([
-        "http://localhost:*",
-        "http://127.0.0.1:*"
-    ])
+ALLOWED_ORIGINS = ["*"]  # Allow all origins in development
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition", "Content-Length"],
+    max_age=3600
 )
 
 # Thread pool for background jobs
@@ -152,6 +144,14 @@ def generate_gyroid_field(chunk: Tuple[slice, slice, slice], period: float, X: n
             np.cos(Z[x_chunk, y_chunk, z_chunk] * 2 * np.pi * period) +
             np.sin(Z[x_chunk, y_chunk, z_chunk] * 2 * np.pi * period) * 
             np.cos(X[x_chunk, y_chunk, z_chunk] * 2 * np.pi * period))
+
+def process_containment_chunk(mesh, points):
+    """Process containment check for a chunk of points with a timeout"""
+    try:
+        return mesh.contains(points)
+    except Exception as e:
+        logger.error(f"Containment check error: {str(e)}")
+        raise
 
 def process_gyroid_job(
     job_id: str,
@@ -321,54 +321,62 @@ async def generate_gyroid(
 
 @app.get("/job/{job_id}")
 async def get_job_status(job_id: str):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = jobs[job_id]
-    
-    # Log job status
-    logger.info(f"Job {job_id} status: {job.status}, progress: {job.progress}")
-    if job.error:
-        logger.error(f"Job {job_id} error: {job.error}")
-    
-    return {
-        "id": job.id,
-        "status": job.status,
-        "progress": job.progress,
-        "error": job.error,
-        "result_file": job.result_file if job.status == "completed" else None
-    }
+    """Get the status of a job"""
+    try:
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        job = jobs[job_id]
+        logger.info(f"Job {job_id} status: {job.status}, progress: {job.progress}")
+        
+        # Check if job is completed but result file doesn't exist
+        if job.status == "completed" and job.result_file and not os.path.exists(job.result_file):
+            job.status = "failed"
+            job.error = "Result file not found"
+            logger.error(f"Job {job_id} marked as failed: result file not found")
+        
+        return {
+            "status": job.status,
+            "progress": job.progress,
+            "error": job.error,
+            "created_at": job.created_at
+        }
+    except Exception as e:
+        logger.error(f"Error getting job status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/job/{job_id}/result")
 async def get_job_result(job_id: str, background_tasks: BackgroundTasks):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = jobs[job_id]
-    if job.status != "completed":
-        raise HTTPException(status_code=400, detail=f"Job not completed, status: {job.status}")
-    
-    if not job.result_file:
-        raise HTTPException(status_code=404, detail="No result file available")
-    
-    if not os.path.exists(job.result_file):
-        raise HTTPException(status_code=404, detail="Result file not found")
-    
+    """Get the result file of a completed job"""
     try:
-        response = FileResponse(
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        job = jobs[job_id]
+        
+        if job.status == "failed":
+            raise HTTPException(status_code=400, detail=job.error or "Job failed")
+        
+        if job.status != "completed":
+            raise HTTPException(status_code=400, detail="Job not completed")
+        
+        if not job.result_file or not os.path.exists(job.result_file):
+            job.status = "failed"
+            job.error = "Result file not found"
+            raise HTTPException(status_code=400, detail="Result file not found")
+        
+        # Schedule cleanup after sending the file
+        background_tasks.add_task(cleanup_temp_dir, job)
+        
+        return FileResponse(
             job.result_file,
-            media_type="model/stl",
+            media_type="application/octet-stream",
             filename="output.stl"
         )
-        
-        # Only clean up after successful file send
-        background_tasks.add_task(cleanup_temp_dir, job)
-        response.background = background_tasks
-        
-        return response
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error sending result file: {str(e)}")
+        logger.error(f"Error getting job result: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 def simplify_mesh(mesh, target_faces=10000):
@@ -436,7 +444,6 @@ def generate_gyroid_mesh_sync(
 
         # Log mesh info
         logger.info(f"Input mesh: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces")
-        logger.info(f"Mesh bounds: {mesh.bounds}")
         memory = check_memory_usage()
         logger.info(f"Current memory usage: {memory:.1f}%")
 
@@ -460,6 +467,14 @@ def generate_gyroid_mesh_sync(
 
         # Create regular grid with reduced resolution for containment check
         containment_resolution = min(60, resolution)  # Use lower resolution for containment
+        target_resolution = resolution  # Store target resolution for final output
+        
+        # Adjust resolution based on mode
+        if mode == "surface":
+            # Surface mode needs higher resolution for good quality
+            resolution = max(resolution, 80)  # Ensure minimum resolution of 80 for surface mode
+            logger.info(f"Adjusted resolution to {resolution} for surface mode")
+            
         x = np.linspace(0, 1, containment_resolution)
         y = np.linspace(0, 1, containment_resolution)
         z = np.linspace(0, 1, containment_resolution)
@@ -472,40 +487,64 @@ def generate_gyroid_mesh_sync(
         total_chunks = total_points // chunk_size + (1 if total_points % chunk_size else 0)
         logger.info(f"Processing containment in {total_chunks} chunks at resolution {containment_resolution}")
         
-        # Process containment check with larger chunks but lower resolution
-        for i in range(0, total_points, chunk_size):
-            end_idx = min(i + chunk_size, total_points)
-            chunk_points = np.zeros((end_idx - i, 3))
-            flat_indices = np.arange(i, end_idx)
-            chunk_points[:, 0] = x[flat_indices // (containment_resolution * containment_resolution)]
-            chunk_points[:, 1] = y[(flat_indices // containment_resolution) % containment_resolution]
-            chunk_points[:, 2] = z[flat_indices % containment_resolution]
-            
-            inside[i:end_idx] = mesh_scaled.contains(chunk_points)
-            job.progress = 0.4 + 0.2 * (i / total_points)
-            check_memory_usage()
-            del chunk_points
-            gc.collect()
+        try:
+            for i in range(0, total_points, chunk_size):
+                end_idx = min(i + chunk_size, total_points)
+                logger.info(f"Processing containment chunk {i//chunk_size + 1}/{total_chunks}")
+                
+                try:
+                    chunk_points = np.zeros((end_idx - i, 3))
+                    flat_indices = np.arange(i, end_idx)
+                    chunk_points[:, 0] = x[flat_indices // (containment_resolution * containment_resolution)]
+                    chunk_points[:, 1] = y[(flat_indices // containment_resolution) % containment_resolution]
+                    chunk_points[:, 2] = z[flat_indices % containment_resolution]
+                    
+                    # Add timeout to contains check to prevent hanging
+                    start_time = time.time()
+                    inside[i:end_idx] = process_containment_chunk(mesh_scaled, chunk_points)
+                    elapsed = time.time() - start_time
+                    logger.info(f"Chunk {i//chunk_size + 1} processed in {elapsed:.2f} seconds")
+                    
+                    if elapsed > 30:  # If any chunk takes more than 30 seconds, something is wrong
+                        raise TimeoutError(f"Containment check taking too long ({elapsed:.2f}s)")
+                    
+                    job.progress = 0.4 + 0.2 * (i / total_points)
+                    memory = check_memory_usage()
+                    logger.info(f"Memory usage: {memory:.1f}%")
+                    
+                    del chunk_points
+                    gc.collect()
+                
+                except Exception as e:
+                    logger.error(f"Error processing chunk {i//chunk_size + 1}: {str(e)}")
+                    raise
         
+        except Exception as e:
+            logger.error(f"Containment check failed: {str(e)}")
+            job.status = "failed"
+            job.error = f"Containment check failed: {str(e)}"
+            return False
+        
+        logger.info("Containment check completed successfully")
         del mesh_scaled
         
         # Reshape and resize to target resolution if needed
         inside = inside.reshape((containment_resolution, containment_resolution, containment_resolution))
-        if containment_resolution != resolution:
+        if containment_resolution != target_resolution:
             # Use nearest neighbor interpolation for boolean array
             from scipy.ndimage import zoom
-            zoom_factor = resolution / containment_resolution
+            zoom_factor = target_resolution / containment_resolution
             inside = zoom(inside.astype(float), zoom_factor, order=0).astype(bool)
-            logger.info(f"Upscaled containment mask to target resolution {resolution}")
+            logger.info(f"Upscaled containment mask to target resolution {target_resolution}")
         
         # Create final resolution grid for gyroid generation
-        x = np.linspace(0, 1, resolution)
-        y = np.linspace(0, 1, resolution)
-        z = np.linspace(0, 1, resolution)
+        x = np.linspace(0, 1, target_resolution)
+        y = np.linspace(0, 1, target_resolution)
+        z = np.linspace(0, 1, target_resolution)
         
         # Improved chunking for containment check
-        chunk_size = min(2000, resolution * resolution)  # Smaller chunks for better memory management
-        total_points = resolution * resolution * resolution
+        chunk_size = min(2000, target_resolution * target_resolution)  # Smaller chunks for better memory management
+        total_points = target_resolution * target_resolution * target_resolution
         gyroid = np.zeros(total_points, dtype=float)
         
         total_chunks = total_points // chunk_size + (1 if total_points % chunk_size else 0)
@@ -517,30 +556,73 @@ def generate_gyroid_mesh_sync(
             # Generate only the points we need for this chunk
             chunk_points = np.zeros((end_idx - i, 3))
             flat_indices = np.arange(i, end_idx)
-            chunk_points[:, 0] = x[flat_indices // (resolution * resolution)]
-            chunk_points[:, 1] = y[(flat_indices // resolution) % resolution]
-            chunk_points[:, 2] = z[flat_indices % resolution]
+            chunk_points[:, 0] = x[flat_indices // (target_resolution * target_resolution)]
+            chunk_points[:, 1] = y[(flat_indices // target_resolution) % target_resolution]
+            chunk_points[:, 2] = z[flat_indices % target_resolution]
             
             # Process gyroid for this chunk
-            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')  # Regular meshgrid for gyroid
             if mode == "surface":
-                gyroid[i:end_idx] = (np.sin(X[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(Y[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) +
-                                    np.sin(Y[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(Z[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) +
-                                    np.sin(Z[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(X[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)))
+                # For surface mode, we need a smaller thickness to create a proper continuous surface
+                surface_thickness = 0.1  # Increased thickness for better visibility
+                # Calculate the signed distance field for the gyroid
+                gyroid_value = (np.sin(chunk_points[:, 0] * 2 * np.pi / (period * scale)) * 
+                              np.cos(chunk_points[:, 1] * 2 * np.pi / (period * scale)) +
+                              np.sin(chunk_points[:, 1] * 2 * np.pi / (period * scale)) * 
+                              np.cos(chunk_points[:, 2] * 2 * np.pi / (period * scale)) +
+                              np.sin(chunk_points[:, 2] * 2 * np.pi / (period * scale)) * 
+                              np.cos(chunk_points[:, 0] * 2 * np.pi / (period * scale)))
+                
+                # Scale the values to ensure we have proper zero crossings
+                gyroid[i:end_idx] = gyroid_value
             else:  # volume
-                gyroid[i:end_idx] = (np.sin(X[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(Y[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) +
-                                    np.sin(Y[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(Z[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) +
-                                    np.sin(Z[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) * 
-                                    np.cos(X[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution] * 2 * np.pi / (period * scale)) - 
+                gyroid[i:end_idx] = (np.sin(chunk_points[:, 0] * 2 * np.pi / (period * scale)) * 
+                                    np.cos(chunk_points[:, 1] * 2 * np.pi / (period * scale)) +
+                                    np.sin(chunk_points[:, 1] * 2 * np.pi / (period * scale)) * 
+                                    np.cos(chunk_points[:, 2] * 2 * np.pi / (period * scale)) +
+                                    np.sin(chunk_points[:, 2] * 2 * np.pi / (period * scale)) * 
+                                    np.cos(chunk_points[:, 0] * 2 * np.pi / (period * scale)) - 
                                     thickness)
             
             # Only keep gyroid inside the mesh
-            gyroid[i:end_idx] = np.where(inside[flat_indices // (resolution * resolution), (flat_indices // resolution) % resolution, flat_indices % resolution], gyroid[i:end_idx], 1.0 if mode == "volume" else 0.0)
+            if mode == "surface":
+                # For surface mode, we want to keep only the parts near the mesh surface
+                mask = inside[flat_indices // (target_resolution * target_resolution), 
+                            (flat_indices // target_resolution) % target_resolution, 
+                            flat_indices % target_resolution]
+                
+                # Calculate surface region for this chunk
+                chunk_size = end_idx - i
+                chunk_dim = int(np.ceil(np.cbrt(chunk_size)))  # Get nearest cubic dimension
+                
+                # Pad the mask if needed to make it cubic
+                padded_size = chunk_dim ** 3
+                if padded_size > chunk_size:
+                    mask = np.pad(mask, (0, padded_size - chunk_size), mode='edge')
+                
+                # Reshape to 3D for dilation
+                mask_3d = mask.reshape((chunk_dim, chunk_dim, chunk_dim))
+                
+                # Create a dilated version of the mask to find the surface region
+                dilated = binary_dilation(mask_3d, iterations=2)  # Increased dilation
+                eroded = binary_dilation(mask_3d, iterations=1)
+                surface_mask = dilated & ~eroded
+                
+                # Flatten and trim back to original chunk size
+                surface_mask_flat = surface_mask.ravel()[:chunk_size]
+                
+                # Apply mask only to the current chunk
+                # Keep points near the surface, set others to inf
+                gyroid[i:end_idx] = np.where(surface_mask_flat, gyroid[i:end_idx], float('inf'))
+                
+                # Log the number of valid points in this chunk
+                valid_count = np.sum(~np.isinf(gyroid[i:end_idx]))
+                logger.info(f"Chunk {i//chunk_size + 1}/{total_chunks}: {valid_count} valid points")
+            else:
+                # For volume mode, we set outside values to 1.0
+                mask = inside[flat_indices // (target_resolution * target_resolution), 
+                            (flat_indices // target_resolution) % target_resolution, 
+                            flat_indices % target_resolution]
+                gyroid[i:end_idx] = np.where(mask, gyroid[i:end_idx], 1.0)
             
             # Update progress and check memory
             job.progress = 0.7 + 0.2 * (i / total_points)
@@ -550,13 +632,39 @@ def generate_gyroid_mesh_sync(
             del chunk_points
             gc.collect()
         
-        gyroid = gyroid.reshape((resolution, resolution, resolution))
+        gyroid = gyroid.reshape((target_resolution, target_resolution, target_resolution))
         
-        # Generate mesh using marching cubes
-        verts, faces = measure.marching_cubes(gyroid, level=0.0)[:2]
+        # Generate mesh using marching cubes with appropriate parameters
+        if mode == "surface":
+            # First normalize the field to ensure we have proper zero crossings
+            if np.all(np.isinf(gyroid)):
+                raise ValueError("No valid surface found in the mesh")
+                
+            valid_values = gyroid[~np.isinf(gyroid)]
+            logger.info(f"Total valid points: {len(valid_values)}")
+            
+            if len(valid_values) == 0:
+                raise ValueError("No valid surface found in the mesh")
+                
+            min_val = np.min(valid_values)
+            max_val = np.max(valid_values)
+            logger.info(f"Value range: [{min_val}, {max_val}]")
+            
+            if min_val == max_val:
+                raise ValueError("No surface variation found in the mesh")
+            
+            # Ensure we have values crossing zero
+            gyroid = np.where(np.isinf(gyroid), max_val + 1, gyroid)
+            gyroid = (gyroid - min_val) / (max_val - min_val) * 2 - 1
+            
+            # Use zero level for the surface
+            verts, faces = measure.marching_cubes(gyroid, level=0.0, spacing=(1.0, 1.0, 1.0), allow_degenerate=False)[:2]
+            logger.info(f"Generated surface with {len(verts)} vertices and {len(faces)} faces")
+        else:
+            verts, faces = measure.marching_cubes(gyroid, level=0.0)[:2]
         
         # Scale vertices back to original size
-        verts = verts / (resolution - 1)  # Normalize to [0,1]
+        verts = verts / (target_resolution - 1)  # Normalize to [0,1]
         verts = verts * extents + bounds[0]  # Scale to original size
         
         # Create mesh
