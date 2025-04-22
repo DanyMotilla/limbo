@@ -25,7 +25,13 @@ const started = init();
 function createBlob(thickness) {
   // note that you might want to do some caching for more complex models
   return started.then(() => {
-    return drawBox(thickness).blobSTL();
+    const shape = drawBox(thickness);
+    // Use lower resolution STL export for better performance
+    return shape.blobSTL({ 
+      linearDeflection: 0.1,  // Increase this value to reduce resolution (default is 0.01)
+      angularDeflection: 0.5, // Increase this value to reduce resolution (default is 0.1)
+      removeDuplicatePoints: true
+    });
   });
 }
 

@@ -1,10 +1,10 @@
-fastapi==0.68.1
-uvicorn==0.15.0
-numpy==1.21.2
-scipy==1.7.1
-trimesh==3.9.35
-python-multipart==0.0.5
-rtree==1.0.0
-scikit-image==0.18.3
-psutil==5.8.0
-pydantic==1.8.2
+fastapi>=0.68.1
+uvicorn>=0.15.0
+numpy>=1.21.2
+scipy>=1.15.2
+trimesh>=3.9.35
+python-multipart>=0.0.5
+scikit-image>=0.18.3
+psutil>=5.8.0
+pydantic>=1.8.2
+pymeshlab>=2021.10  # Added for better mesh processing

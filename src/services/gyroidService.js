@@ -8,7 +8,7 @@ export async function generateGyroid(stlBlob, params) {
         
         // Create form data
         const formData = new FormData();
-        formData.append('stl_file', stlBlob);
+        formData.append('stl_file', stlBlob, 'input.stl'); // Set filename explicitly
         formData.append('mode', params.mode);
         formData.append('period', params.period);
         formData.append('thickness', params.thickness);
