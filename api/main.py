@@ -12,7 +12,7 @@ import gc
 import psutil
 from typing import Optional, Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
-from scipy.ndimage import binary_fill_holes, binary_dilation
+from scipy.ndimage import binary_fill_holes, binary_dilation, binary_erosion
 from skimage import measure
 import asyncio
 import contextlib
@@ -25,6 +25,10 @@ import shutil
 from contextlib import asynccontextmanager
 import psutil
 import os
+import torchio as tio
+import base64
+import io
+import matplotlib.pyplot as plt
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -221,6 +225,14 @@ def cleanup_temp_dir(job: JobStatus):
             shutil.rmtree(job.temp_dir)
     except Exception as e:
         logger.error(f"Error cleaning up temp dir: {str(e)}")
+
+# Tomography processing models
+class TomographySlice(BaseModel):
+    axis: int = Field(0, description="Axis for slicing (0: Axial, 1: Coronal, 2: Sagittal)")
+    slice_index: int = Field(0, description="Index of the slice to view")
+
+class TomographyProcessing(BaseModel):
+    threshold: float = Field(0.5, description="Threshold for surface extraction")
 
 @app.post("/generate_gyroid")
 async def generate_gyroid(
@@ -706,6 +718,148 @@ def generate_gyroid_mesh_sync(
         job.status = "failed"
         job.error = str(e)
         return False
+
+@app.post("/upload_tomography")
+async def upload_tomography(file: UploadFile = File(...)):
+    """Upload and process tomography data"""
+    try:
+        # Create temp directory if it doesn't exist
+        os.makedirs(TEMP_ROOT, exist_ok=True)
+        
+        # Save uploaded file
+        file_path = os.path.join(TEMP_ROOT, f"tomo_{uuid.uuid4()}.nii.gz")
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Load the tomography data using TorchIO
+        subject = tio.Subject({"t1": tio.ScalarImage(file_path)})
+        t1_image = subject.t1
+        
+        # Convert to numpy and normalize
+        volume_data = t1_image.data.numpy().squeeze()
+        volume_data = (volume_data - volume_data.min()) / (volume_data.max() - volume_data.min())
+        
+        # Save processed data
+        processed_path = os.path.join(TEMP_ROOT, f"processed_{os.path.basename(file_path)}.npy")
+        np.save(processed_path, volume_data)
+        
+        return {
+            "message": "Tomography data processed successfully",
+            "file_id": os.path.basename(processed_path),
+            "dimensions": volume_data.shape
+        }
+    except Exception as e:
+        logger.error(f"Error processing tomography: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tomography_slice/{file_id}")
+async def get_tomography_slice(file_id: str, axis: int = 0, slice_index: int = 0):
+    """Get a slice from the tomography data"""
+    try:
+        # Load the volume data
+        file_path = os.path.join(TEMP_ROOT, f"{file_id}.npy")
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        volume_data = np.load(file_path)
+        
+        # Get the slice
+        if axis == 0:
+            slice_data = volume_data[slice_index, :, :]
+        elif axis == 1:
+            slice_data = volume_data[:, slice_index, :]
+        else:
+            slice_data = volume_data[:, :, slice_index]
+        
+        # Convert to image
+        plt.imsave('temp.png', slice_data, cmap='gray')
+        with open('temp.png', 'rb') as f:
+            image_bytes = f.read()
+        os.remove('temp.png')
+        
+        return {"image": base64.b64encode(image_bytes).decode()}
+    except Exception as e:
+        logger.error(f"Error getting slice: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/process_tomography/{file_id}")
+async def process_tomography(file_id: str, threshold: float = 0.5):
+    """Process tomography data into a 3D mesh"""
+    try:
+        # Load the volume data
+        file_path = os.path.join(TEMP_ROOT, f"{file_id}.npy")
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+            
+        volume_data = np.load(file_path)
+        
+        # Apply binary operations for better segmentation
+        binary_volume = volume_data > threshold
+        binary_volume = binary_fill_holes(binary_volume)
+        binary_volume = binary_erosion(binary_volume)
+        binary_volume = binary_dilation(binary_volume)
+        
+        # Create vertices and faces using marching cubes
+        verts, faces, _, _ = measure.marching_cubes(binary_volume)
+        
+        # Normalize vertices to [-1, 1] range
+        verts = verts / np.max(volume_data.shape)
+        verts = verts * 2 - 1
+        
+        # Create a mesh
+        mesh_data = trimesh.Trimesh(vertices=verts, faces=faces)
+        
+        # Save as STL
+        output_path = os.path.join(TEMP_ROOT, f"{file_id}_mesh.stl")
+        mesh_data.export(output_path)
+        
+        return FileResponse(
+            output_path,
+            media_type="application/octet-stream",
+            filename="brain_mesh.stl"
+        )
+    except Exception as e:
+        logger.error(f"Error processing tomography: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def export_mesh(verts, faces, filename):
+    """Export mesh as STL file"""
+    # Create mesh
+    mesh_data = trimesh.Trimesh(vertices=verts, faces=faces)
+    # Save as STL
+    mesh_data.export(filename)
+
+@app.get("/sample_data")
+async def get_sample_data():
+    """Download and process the Colin27 sample dataset"""
+    try:
+        # Create temp directory if it doesn't exist
+        os.makedirs(TEMP_ROOT, exist_ok=True)
+        
+        # Download Colin27 dataset
+        subject = tio.datasets.Colin27()
+        t1_image = subject.t1
+        volume_data = t1_image.data.numpy().squeeze()
+        
+        # Normalize the data
+        volume_data = (volume_data - volume_data.min()) / (volume_data.max() - volume_data.min())
+        
+        # Save processed data
+        file_id = f"sample_{uuid.uuid4()}"
+        processed_path = os.path.join(TEMP_ROOT, f"{file_id}.npy")
+        np.save(processed_path, volume_data)
+        
+        return {
+            "message": "Sample data loaded successfully",
+            "file_id": file_id,
+            "dimensions": volume_data.shape
+        }
+    except Exception as e:
+        logger.error(f"Error loading sample data: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

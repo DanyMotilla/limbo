@@ -6,6 +6,8 @@ import ThreeContext from "./ThreeContext.jsx";
 import ReplicadMesh from "./ReplicadMesh.jsx";
 import TabPanel from "./components/TabPanel.jsx";
 import { generateGyroid } from "./services/gyroidService.js";
+import { Tabs, Tab, Box } from '@mui/material';
+import TomographyViewer from './components/TomographyViewer';
 
 import cadWorker from "./worker.js?worker";
 const cad = wrap(new cadWorker());
@@ -345,8 +347,8 @@ export default function ReplicadApp() {
     </div>
   );
 
-  // Empty Scene Content
-  const EmptyScene = (
+  // Tomography View
+  const TomographyView = (
     <div style={{ 
       height: '100%',
       position: 'absolute',
@@ -354,9 +356,7 @@ export default function ReplicadApp() {
       top: 0,
       left: 0
     }}>
-      <ThreeContext>
-        {/* Empty scene with just the Three.js context */}
-      </ThreeContext>
+      <TomographyViewer />
     </div>
   );
 
@@ -388,47 +388,51 @@ export default function ReplicadApp() {
   );
 
   return (
-    <main style={{
-      display: 'flex',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      overflow: 'hidden'
-    }}>
-      {/* Left Side */}
-      <div style={{ 
-        flex: 1, 
-        borderRight: '1px solid #ccc',
-        height: '100%',
-        overflow: 'hidden'
-      }}>
-        <TabPanel
-          tabs={[
-            { label: 'Parameters', content: ParametersPanel },
-            { label: 'Nodes', content: NodeSystemPanel }
-          ]}
-          activeTab={leftActiveTab}
-          onTabChange={setLeftActiveTab}
-        />
-      </div>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <main style={{
+          display: 'flex',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflow: 'hidden'
+        }}>
+          {/* Left Side */}
+          <div style={{ 
+            flex: 1, 
+            borderRight: '1px solid #ccc',
+            height: '100%',
+            overflow: 'hidden'
+          }}>
+            <TabPanel
+              tabs={[
+                { label: 'Parameters', content: ParametersPanel },
+                { label: 'Nodes', content: NodeSystemPanel }
+              ]}
+              activeTab={leftActiveTab}
+              onTabChange={setLeftActiveTab}
+            />
+          </div>
 
-      {/* Right Side */}
-      <div style={{ 
-        flex: 1,
-        height: '100%',
-        overflow: 'hidden'
-      }}>
-        <TabPanel
-          tabs={[
-            { label: 'Parametric Shape', content: ParametricView },
-            { label: '3D Tomography View', content: EmptyScene }
-          ]}
-          activeTab={rightActiveTab}
-          onTabChange={setRightActiveTab}
-        />
-      </div>
-    </main>
+          {/* Right Side */}
+          <div style={{ 
+            flex: 1,
+            height: '100%',
+            overflow: 'hidden'
+          }}>
+            <TabPanel
+              tabs={[
+                { label: 'Parametric Shape', content: ParametricView },
+                { label: '3D Tomography View', content: TomographyView }
+              ]}
+              activeTab={rightActiveTab}
+              onTabChange={setRightActiveTab}
+            />
+          </div>
+        </main>
+      </Box>
+    </div>
   );
 }
