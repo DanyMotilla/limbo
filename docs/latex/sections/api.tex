@@ -1,0 +1,109 @@
+\chapter{API Reference}
+
+\section{API Overview}
+The LIMBO API provides RESTful endpoints for mesh processing and gyroid generation.
+
+\section{Authentication}
+Currently, the API does not require authentication for local development. For production deployment, implement appropriate authentication mechanisms.
+
+\section{Endpoints}
+\subsection{Generate Gyroid}
+\begin{tcolorbox}[title=POST /generate\_gyroid]
+\textbf{Description:} Generate a gyroid lattice structure from an STL file
+
+\textbf{Parameters:}
+\begin{itemize}
+    \item \texttt{stl\_file}: STL file (multipart/form-data)
+    \begin{itemize}
+        \item Maximum vertices: 1,000,000
+    \end{itemize}
+    \item \texttt{mode}: String ("surface" or "volume")
+    \item \texttt{period}: Float (0.5 to 10.0)
+    \item \texttt{thickness}: Float (0.05 to 0.5)
+    \item \texttt{resolution}: Integer (20 to 100)
+\end{itemize}
+
+\textbf{Response:}
+\begin{lstlisting}[language=json]
+{
+    "job_id": "uuid-string"
+}
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Check Job Status}
+\begin{tcolorbox}[title=GET /job/\{job\_id\}]
+\textbf{Description:} Check the status of a gyroid generation job
+
+\textbf{Parameters:}
+\begin{itemize}
+    \item \texttt{job\_id}: UUID string (path parameter)
+\end{itemize}
+
+\textbf{Response:}
+\begin{lstlisting}[language=json]
+{
+    "id": "uuid-string",
+    "status": "pending|processing|completed|failed",
+    "progress": 0.0 to 1.0,
+    "result_file": "path/to/file.stl",
+    "error": null
+}
+\end{lstlisting}
+
+\textbf{Progress Stages:}
+\begin{itemize}
+    \item 0.0-0.4: Initial setup and mesh loading
+    \item 0.4-0.6: Containment analysis
+    \item 0.6-0.9: Gyroid pattern generation
+    \item 0.9-1.0: Final mesh processing and export
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Download Result}
+\begin{tcolorbox}[title=GET /job/\{job\_id\}/result]
+\textbf{Description:} Download the generated STL file
+
+\textbf{Parameters:}
+\begin{itemize}
+    \item \texttt{job\_id}: UUID string (path parameter)
+\end{itemize}
+
+\textbf{Response:}
+\begin{itemize}
+    \item Content-Type: application/octet-stream
+    \item File: Generated STL file
+\end{itemize}
+\end{tcolorbox}
+
+\section{Error Handling}
+\subsection{HTTP Status Codes}
+\begin{itemize}
+    \item \texttt{200}: Success
+    \item \texttt{400}: Bad Request
+    \item \texttt{404}: Not Found
+    \item \texttt{500}: Internal Server Error
+    \item \texttt{507}: Insufficient Storage
+\end{itemize}
+
+\subsection{Error Response Format}
+\begin{lstlisting}[language=json]
+{
+    "detail": "Error message description"
+}
+\end{lstlisting}
+
+\section{Rate Limiting}
+\begin{itemize}
+    \item Maximum 10 requests per minute per IP
+    \item Maximum 2 concurrent jobs per IP
+    \item Job results stored for 24 hours
+\end{itemize}
+
+\section{Resource Limits}
+\begin{itemize}
+    \item Maximum input file size: 50MB
+    \item Maximum input vertices: 1,000,000
+    \item Maximum output vertices: 1,000,000
+    \item Maximum processing time: 30 minutes
+\end{itemize}

@@ -1,0 +1,134 @@
+\documentclass[11pt,a4paper]{report}
+
+% Basic packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{geometry}
+\usepackage[most]{tcolorbox}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{enumitem}
+
+% Document settings
+\geometry{margin=2.5cm}
+
+% Code listing settings
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{dockerblue}{rgb}{0.18,0.39,0.79}
+
+% Configure listings for different languages
+\lstdefinelanguage{JavaScript}{
+  keywords={break,case,catch,continue,debugger,default,delete,do,else,finally,for,function,if,in,instanceof,new,return,switch,this,throw,try,typeof,var,void,while,with,const,let,class,extends,export,import,super},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
+
+\lstdefinelanguage{docker}{
+  keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
+  keywordstyle=\color{dockerblue}\bfseries,
+  sensitive=false,
+  comment=[l]{\#},
+  morestring=[b]",
+  morestring=[b]'
+}
+
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,y,n},
+  keywordstyle=\color{darkgray}\bfseries,
+  basicstyle=\ttfamily\footnotesize,
+  sensitive=false,
+  comment=[l]{\#},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[s]{>}{\ },
+  morestring=[s]{|}{\ },
+  literate=
+    {>}{{\textcolor{darkgray}{>}}}1
+    {|}{{\textcolor{darkgray}{|}}}1
+    {\ -\ }{{\textcolor{darkgray}{\ -\ }}}3,
+}
+
+\lstdefinelanguage{json}{
+  literate=
+   *{0}{{{\color{codepurple}0}}}{1}
+    {1}{{{\color{codepurple}1}}}{1}
+    {2}{{{\color{codepurple}2}}}{1}
+    {3}{{{\color{codepurple}3}}}{1}
+    {4}{{{\color{codepurple}4}}}{1}
+    {5}{{{\color{codepurple}5}}}{1}
+    {6}{{{\color{codepurple}6}}}{1}
+    {7}{{{\color{codepurple}7}}}{1}
+    {8}{{{\color{codepurple}8}}}{1}
+    {9}{{{\color{codepurple}9}}}{1}
+    {:}{{{\color{black}:}}}{1}
+    {,}{{{\color{black},}}}{1}
+    {\{}{{{\color{black}{\{}}}}{1}
+    {\}}{{{\color{black}{\}}}}}{1}
+    {[}{{{\color{black}[}}}{1}
+    {]}{{{\color{black}]}}}{1},
+  basicstyle=\ttfamily,
+  columns=fullflexible,
+  breaklines=true,
+  breakatwhitespace=false
+}
+
+% Configure tcolorbox
+\tcbuselibrary{listings,skins,breakable}
+
+% Default listing style
+\lstset{
+    backgroundcolor=\color{codegray},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    numbers=left,
+    inputencoding=utf8,
+    extendedchars=true,
+    literate={+}{{$+$}}1
+}
+
+% Directory tree macros
+\newcommand{\dirtree}[1]{\begin{itemize}[noitemsep,label={}]#1\end{itemize}}
+\newcommand{\diritem}[1]{\item[+---] #1}
+\newcommand{\dirsubitem}[1]{\item[\quad+---] #1}
+
+% Begin document
+\begin{document}
+
+\title{LIMBO Documentation}
+\author{LIMBO Team}
+\date{\today}
+
+\maketitle
+\tableofcontents
+
+\input{sections/introduction}
+\input{sections/architecture}
+\input{sections/frontend}
+\input{sections/backend}
+\input{sections/api}
+\input{sections/development}
+\input{sections/deployment}
+
+\end{document}

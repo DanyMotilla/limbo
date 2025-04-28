@@ -1,0 +1,146 @@
+\chapter{Deployment}
+
+\section{Deployment Overview}
+This section covers the deployment process for both frontend and backend components of LIMBO.
+
+\section{Frontend Deployment}
+\subsection{Build Process}
+\begin{tcolorbox}[title=Build Frontend]
+\begin{lstlisting}[language=bash]
+# Install dependencies
+npm install
+
+# Build for production
+npm run build
+
+# Output will be in dist/ directory
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Deployment Options}
+\subsubsection{Static Hosting}
+\begin{itemize}
+    \item Netlify
+    \item Vercel
+    \item GitHub Pages
+    \item AWS S3 + CloudFront
+\end{itemize}
+
+\subsubsection{Configuration}
+\begin{lstlisting}[language=javascript]
+// vite.config.js
+export default {
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Optimize chunking
+        }
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\section{Backend Deployment}
+\subsection{Docker Deployment}
+\begin{tcolorbox}[title=Dockerfile]
+\begin{lstlisting}[language=docker]
+FROM python:3.8-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Deployment Steps}
+\begin{lstlisting}[language=bash]
+# Build Docker image
+docker build -t limbo-api .
+
+# Run container
+docker run -d -p 8000:8000 limbo-api
+\end{lstlisting}
+
+\subsection{Cloud Deployment Options}
+\begin{itemize}
+    \item AWS Elastic Beanstalk
+    \item Google Cloud Run
+    \item Azure App Service
+    \item Digital Ocean App Platform
+\end{itemize}
+
+\section{Environment Configuration}
+\subsection{Frontend Environment Variables}
+\begin{lstlisting}[language=bash]
+VITE_API_URL=https://api.example.com
+VITE_MAX_FILE_SIZE=50000000
+VITE_ENABLE_ANALYTICS=true
+\end{lstlisting}
+
+\subsection{Backend Environment Variables}
+\begin{lstlisting}[language=bash]
+DATABASE_URL=postgresql://user:pass@localhost/db
+REDIS_URL=redis://localhost
+MAX_WORKERS=4
+DEBUG=false
+\end{lstlisting}
+
+\section{Monitoring and Logging}
+\subsection{Frontend Monitoring}
+\begin{itemize}
+    \item Error tracking (Sentry)
+    \item Performance monitoring
+    \item User analytics
+    \item Console error reporting
+\end{itemize}
+
+\subsection{Backend Monitoring}
+\begin{itemize}
+    \item Application logs
+    \item System metrics
+    \item API metrics
+    \item Error tracking
+\end{itemize}
+
+\section{Scaling Considerations}
+\subsection{Frontend Scaling}
+\begin{itemize}
+    \item CDN integration
+    \item Asset optimization
+    \item Caching strategies
+    \item Load balancing
+\end{itemize}
+
+\subsection{Backend Scaling}
+\begin{itemize}
+    \item Horizontal scaling
+    \item Load balancing
+    \item Database optimization
+    \item Caching layer
+\end{itemize}
+
+\section{Security Considerations}
+\subsection{Frontend Security}
+\begin{itemize}
+    \item HTTPS enforcement
+    \item CSP configuration
+    \item Input validation
+    \item XSS prevention
+\end{itemize}
+
+\subsection{Backend Security}
+\begin{itemize}
+    \item API authentication
+    \item Rate limiting
+    \item Input sanitization
+    \item CORS configuration
+\end{itemize}

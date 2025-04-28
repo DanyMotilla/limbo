@@ -1,0 +1,210 @@
+\chapter{Configuration Reference}
+This appendix provides detailed configuration information for both frontend and backend components.
+
+\section{Frontend Configuration}
+\subsection{Environment Variables}
+\begin{tcolorbox}[title=.env]
+\begin{lstlisting}
+# API Configuration
+VITE_API_URL=http://localhost:8000
+VITE_API_TIMEOUT=30000
+VITE_API_RETRY_ATTEMPTS=3
+
+# File Upload
+VITE_MAX_FILE_SIZE=50000000
+VITE_ALLOWED_EXTENSIONS=.stl
+
+# UI Configuration
+VITE_DEFAULT_THEME=light
+VITE_ENABLE_ANALYTICS=false
+VITE_POLLING_INTERVAL=1000
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Build Configuration}
+\begin{tcolorbox}[title=vite.config.js]
+\begin{lstlisting}[language=javascript]
+export default {
+  server: {
+    port: 5173,
+    strictPort: true
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    chunkSizeWarningLimit: 2000
+  },
+  optimizeDeps: {
+    include: ['three', '@react-three/fiber']
+  }
+}
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{Backend Configuration}
+\subsection{Environment Variables}
+\begin{tcolorbox}[title=.env]
+\begin{lstlisting}
+# Server Configuration
+PORT=8000
+HOST=0.0.0.0
+WORKERS=4
+DEBUG=false
+
+# Processing Limits
+MAX_VERTICES=1000000
+MAX_FILE_SIZE=50000000
+MAX_MEMORY_PERCENT=50
+MAX_RESOLUTION=100
+
+# Security
+CORS_ORIGINS=http://localhost:5173
+RATE_LIMIT_PER_MINUTE=10
+MAX_CONCURRENT_JOBS=2
+
+# Storage
+TEMP_DIR=/tmp/limbo
+RESULT_RETENTION_HOURS=24
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{FastAPI Configuration}
+\begin{tcolorbox}[title=main.py]
+\begin{lstlisting}[language=python]
+app = FastAPI(
+    title="LIMBO API",
+    description="Lattice Interior Mesh Builder & Optimizer",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# Rate limiting
+app.add_middleware(
+    RateLimitMiddleware,
+    calls=10,
+    period=60
+)
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{Development Tools}
+\subsection{ESLint Configuration}
+\begin{tcolorbox}[title=.eslintrc.js]
+\begin{lstlisting}[language=javascript]
+module.exports = {
+  extends: [
+    'eslint:recommended',
+    'plugin:react/recommended',
+    'plugin:@typescript-eslint/recommended'
+  ],
+  rules: {
+    'react/react-in-jsx-scope': 'off',
+    'no-unused-vars': 'warn',
+    '@typescript-eslint/explicit-module-boundary-types': 'off'
+  }
+}
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Python Development Tools}
+\begin{tcolorbox}[title=setup.cfg]
+\begin{lstlisting}
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+exclude = .git,__pycache__,build,dist
+
+[mypy]
+python_version = 3.8
+warn_return_any = True
+warn_unused_configs = True
+disallow_untyped_defs = True
+
+[tool:pytest]
+testpaths = tests
+python_files = test_*.py
+addopts = --verbose
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{Docker Configuration}
+\subsection{Development Docker Compose}
+\begin{tcolorbox}[title=docker-compose.yml]
+\begin{lstlisting}[language=yaml]
+version: '3.8'
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      
+  backend:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=true
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{CI/CD Configuration}
+\subsection{GitHub Actions}
+\begin{tcolorbox}[title=.github/workflows/ci.yml]
+\begin{lstlisting}[language=yaml]
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+          
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+          
+      - name: Install dependencies
+        run: |
+          npm install
+          cd api && pip install -r requirements.txt
+          
+      - name: Run tests
+        run: |
+          npm test
+          cd api && pytest
+\end{lstlisting}
+\end{tcolorbox}

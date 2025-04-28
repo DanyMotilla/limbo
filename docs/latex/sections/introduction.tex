@@ -1,0 +1,66 @@
+\chapter{Introduction}
+
+\section{Overview}
+LIMBO (Lattice Interior Mesh Builder \& Optimizer) is a web-based application that combines advanced 3D mesh processing with gyroid lattice structure generation. The system provides two main functionalities:
+
+\begin{enumerate}
+    \item \textbf{Gyroid Generation}: Creates optimized gyroid lattice structures within 3D models, with support for both volume-based and surface-based approaches.
+    \item \textbf{Medical Imaging Processing}: Processes medical tomography data to create 3D mesh models, particularly useful for medical applications.
+\end{enumerate}
+
+\section{Purpose}
+The main purpose of LIMBO is to:
+\begin{itemize}
+    \item Generate efficient lattice structures for 3D printing
+    \item Optimize mesh topology for structural integrity
+    \item Provide an intuitive interface for lattice design
+\end{itemize}
+
+\section{Key Features}
+\begin{itemize}
+    \item \textbf{Dual-Mode Processing}:
+        \begin{itemize}
+            \item Volume-based gyroid generation with configurable density
+            \item Surface-based gyroid generation with adjustable thickness
+        \end{itemize}
+    \item \textbf{Interactive Controls}:
+        \begin{itemize}
+            \item Adjustable period, thickness, and resolution parameters
+            \item Real-time preview of generated structures
+            \item Progress tracking during mesh generation
+        \end{itemize}
+    \item \textbf{Medical Imaging Tools}:
+        \begin{itemize}
+            \item Support for tomography data processing
+            \item Multi-plane slice visualization (Axial, Coronal, Sagittal)
+            \item Adjustable threshold for 3D mesh generation
+        \end{itemize}
+    \item \textbf{Export Capabilities}:
+        \begin{itemize}
+            \item STL file export for 3D printing
+            \item Support for both binary and ASCII STL formats
+        \end{itemize}
+\end{itemize}
+
+\section{Technical Stack}
+The application is built using:
+\begin{itemize}
+    \item \textbf{Frontend}: React.js with Three.js for 3D visualization
+    \item \textbf{Backend}: Python FastAPI server for mesh processing
+    \item \textbf{Libraries}:
+        \begin{itemize}
+            \item Trimesh for mesh manipulation
+            \item NumPy for numerical computations
+            \item SciPy for scientific computing
+            \item TorchIO for medical image processing
+        \end{itemize}
+\end{itemize}
+
+\section{System Requirements}
+\begin{itemize}
+    \item Node.js 16+
+    \item Python 3.8+
+    \item pip (Python package manager)
+    \item Minimum 4GB RAM recommended
+    \item Modern web browser with WebGL support
+\end{itemize}

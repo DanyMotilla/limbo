@@ -1,0 +1,128 @@
+\chapter{Development Guide}
+
+\section{Development Environment Setup}
+
+\subsection{Prerequisites}
+\begin{itemize}
+    \item Node.js 16+ and npm
+    \item Python 3.8+
+    \item Git
+    \item Code editor (VS Code recommended)
+    \item 4GB RAM minimum
+\end{itemize}
+
+\subsection{Initial Setup}
+\begin{tcolorbox}[title=Clone and Setup]
+\begin{lstlisting}[language=bash]
+# Clone repository
+git clone https://github.com/yourusername/LIMBO.git
+cd LIMBO
+
+# Install frontend dependencies
+npm install
+
+# Install backend dependencies
+cd api
+pip install -r requirements.txt
+\end{lstlisting}
+\end{tcolorbox}
+
+\section{Development Workflow}
+\subsection{Running the Application}
+\begin{tcolorbox}[title=Start Development Servers]
+\begin{lstlisting}[language=bash]
+# Start frontend (in project root)
+npm run start
+
+# Start backend (in api directory)
+python3 main.py
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsection{Code Style}
+\subsubsection{Frontend}
+\begin{itemize}
+    \item Use ESLint configuration
+    \item Follow Prettier formatting
+    \item Use TypeScript for type safety
+    \item Follow React best practices
+\end{itemize}
+
+\subsubsection{Backend}
+\begin{itemize}
+    \item Follow PEP 8 guidelines
+    \item Use type hints
+    \item Document using docstrings
+    \item Follow FastAPI best practices
+\end{itemize}
+
+\section{Testing}
+\subsection{Frontend Tests}
+\begin{lstlisting}[language=bash]
+# Run frontend tests
+npm test
+
+# Run with coverage
+npm test -- --coverage
+\end{lstlisting}
+
+\subsection{Backend Tests}
+\begin{lstlisting}[language=bash]
+# Run backend tests
+pytest
+
+# Run with coverage
+pytest --cov=app
+\end{lstlisting}
+
+\section{Debugging}
+\subsection{Frontend Debugging}
+\begin{itemize}
+    \item Use React Developer Tools
+    \item Chrome DevTools for network/performance
+    \item Console logging with different levels
+    \item Source maps for debugging
+\end{itemize}
+
+\subsection{Backend Debugging}
+\begin{itemize}
+    \item FastAPI automatic docs (/docs)
+    \item Python debugger (pdb)
+    \item Logging with different levels
+    \item Memory profiling tools
+\end{itemize}
+
+\section{Performance Optimization}
+\subsection{Frontend}
+\begin{itemize}
+    \item Use React.memo for expensive components
+    \item Implement proper lazy loading
+    \item Optimize Three.js renders
+    \item Monitor bundle size
+\end{itemize}
+
+\subsection{Backend}
+\begin{itemize}
+    \item Profile mesh processing operations
+    \item Optimize memory usage
+    \item Use caching where appropriate
+    \item Monitor API response times
+\end{itemize}
+
+\section{Version Control}
+\subsection{Branch Strategy}
+\begin{itemize}
+    \item main: Production-ready code
+    \item develop: Integration branch
+    \item feature/*: New features
+    \item bugfix/*: Bug fixes
+    \item release/*: Release preparation
+\end{itemize}
+
+\subsection{Commit Guidelines}
+\begin{itemize}
+    \item Use conventional commits
+    \item Include issue references
+    \item Keep commits atomic
+    \item Write clear commit messages
+\end{itemize}

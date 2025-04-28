@@ -1,0 +1,122 @@
+\chapter{Backend Documentation}
+
+\section{Backend Overview}
+The backend is built using FastAPI and Python, focusing on efficient mesh processing and robust API endpoints.
+
+\section{Core Components}
+\subsection{FastAPI Application}
+\begin{lstlisting}[language=Python]
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(
+    title="LIMBO API",
+    description="Lattice Interior Mesh Builder & Optimizer"
+)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+\end{lstlisting}
+
+\section{Mesh Processing Pipeline}
+\subsection{Surface Mode Implementation}
+\begin{itemize}
+    \item Signed distance field approach
+    \item Adaptive surface thickness
+    \item Smart dilation/erosion
+    \item Resolution adjustment
+\end{itemize}
+
+\subsection{Volume Mode Implementation}
+\begin{lstlisting}[language=Python]
+def process_volume_lattice(mesh, params):
+    """
+    Process volume lattice with chunked approach
+    """
+    chunks = divide_into_chunks(mesh)
+    results = []
+    
+    for chunk in chunks:
+        # Process each chunk
+        processed = apply_gyroid_pattern(
+            chunk,
+            scale=params.scale,
+            thickness=params.thickness
+        )
+        results.append(processed)
+    
+    return merge_chunks(results)
+\end{lstlisting}
+
+\section{Memory Management}
+\subsection{Chunked Processing}
+\begin{itemize}
+    \item Automatic chunk size calculation
+    \item Memory monitoring
+    \item Garbage collection triggers
+    \item Progress tracking
+\end{itemize}
+
+\section{Error Handling}
+\begin{lstlisting}[language=Python]
+from fastapi import HTTPException
+
+async def process_stl(file: UploadFile):
+    try:
+        # Validate file
+        if not file.filename.endswith('.stl'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only STL files are supported"
+            )
+            
+        # Process file
+        result = await process_mesh(file)
+        return result
+        
+    except MemoryError:
+        raise HTTPException(
+            status_code=507,
+            detail="Insufficient memory"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+\end{lstlisting}
+
+\section{Performance Optimization}
+\subsection{NumPy Optimization}
+\begin{itemize}
+    \item Vectorized operations
+    \item Memory-efficient array operations
+    \item Parallel processing where applicable
+    \item Cache optimization
+\end{itemize}
+
+\section{Development Guidelines}
+\subsection{Code Organization}
+\dirtree{
+\diritem{api/}
+\dirsubitem{core/}
+\dirsubitem{\quad mesh\_processing/}
+\dirsubitem{\quad optimization/}
+\dirsubitem{\quad utils/}
+\dirsubitem{models/}
+\dirsubitem{routes/}
+\dirsubitem{services/}
+}
+
+\subsection{Testing}
+\begin{itemize}
+    \item Unit tests for core functions
+    \item Integration tests for API endpoints
+    \item Performance benchmarks
+    \item Memory usage tests
+\end{itemize}

@@ -1,0 +1,95 @@
+\chapter{Frontend Documentation}
+
+\section{Frontend Overview}
+The frontend is built using React 18.2.0 with modern JavaScript features and follows a component-based architecture.
+
+\section{Key Components}
+\subsection{3D Viewer}
+\begin{lstlisting}[language=JavaScript]
+// Example Three.js component structure
+const Viewer = () => {
+  return (
+    <Canvas>
+      <OrbitControls />
+      <ambientLight />
+      <ModelView />
+    </Canvas>
+  );
+};
+\end{lstlisting}
+
+\subsection{File Upload}
+\begin{itemize}
+    \item Handles STL file uploads
+    \item Validates file size and format
+    \item Shows upload progress
+    \item Provides error feedback
+\end{itemize}
+
+\section{State Management}
+The application uses React's built-in state management with hooks:
+\begin{itemize}
+    \item useState for local component state
+    \item useContext for global state
+    \item Custom hooks for complex operations
+\end{itemize}
+
+\section{API Integration}
+\begin{lstlisting}[language=JavaScript]
+// Example API call structure
+const processModel = async (file, params) => {
+  try {
+    const formData = new FormData();
+    formData.append('stl_file', file);
+    formData.append('params', JSON.stringify(params));
+    
+    const response = await fetch('/api/generate_gyroid', {
+      method: 'POST',
+      body: formData
+    });
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Processing failed:', error);
+    throw error;
+  }
+};
+\end{lstlisting}
+
+\section{Error Handling}
+The frontend implements comprehensive error handling:
+\begin{itemize}
+    \item Input validation
+    \item Network error handling
+    \item Processing status feedback
+    \item User-friendly error messages
+\end{itemize}
+
+\section{Performance Optimization}
+\begin{itemize}
+    \item Code splitting for optimal loading
+    \item React.lazy for component lazy loading
+    \item Memoization of expensive computations
+    \item Efficient 3D model handling
+\end{itemize}
+
+\section{Development Guidelines}
+\subsection{Code Style}
+\begin{itemize}
+    \item Use functional components
+    \item Implement proper TypeScript types
+    \item Follow ESLint configuration
+    \item Write unit tests for components
+\end{itemize}
+
+\subsection{Component Structure}
+\dirtree{
+\diritem{src/}
+\dirsubitem{components/}
+\dirsubitem{\quad Viewer/}
+\dirsubitem{\quad Controls/}
+\dirsubitem{\quad Common/}
+\dirsubitem{hooks/}
+\dirsubitem{services/}
+\dirsubitem{utils/}
+}

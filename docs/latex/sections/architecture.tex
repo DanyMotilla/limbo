@@ -1,0 +1,150 @@
+\chapter{System Architecture}
+
+\section{System Architecture Overview}
+LIMBO follows a client-server architecture with a clear separation between the frontend user interface and backend processing components.
+
+\section{Frontend Architecture}
+\subsection{Core Components}
+\begin{itemize}
+    \item \textbf{React.js Application}
+        \begin{itemize}
+            \item Main application container (\texttt{App.jsx})
+            \item 3D visualization context (\texttt{ThreeContext.jsx})
+            \item Mesh rendering components (\texttt{ReplicadMesh.jsx})
+        \end{itemize}
+    \item \textbf{User Interface}
+        \begin{itemize}
+            \item Material-UI based components
+            \item Tab-based navigation system
+            \item Interactive parameter controls
+        \end{itemize}
+    \item \textbf{3D Visualization}
+        \begin{itemize}
+            \item Three.js for 3D rendering
+            \item OrbitControls for model manipulation
+            \item Real-time mesh preview
+        \end{itemize}
+\end{itemize}
+
+\section{Backend Architecture}
+\subsection{Server Components}
+\begin{itemize}
+    \item \textbf{FastAPI Server}
+        \begin{itemize}
+            \item RESTful API endpoints
+            \item Asynchronous request handling
+            \item Background task processing
+        \end{itemize}
+    \item \textbf{Processing Pipeline}
+        \begin{itemize}
+            \item STL file processing
+            \item Gyroid pattern generation
+            \item Mesh optimization
+            \item Tomography data processing
+        \end{itemize}
+    \item \textbf{Job Management}
+        \begin{itemize}
+            \item Progress tracking
+            \item Error handling
+            \item Resource management
+        \end{itemize}
+\end{itemize}
+
+\section{Data Flow}
+\begin{enumerate}
+    \item \textbf{Input Processing}
+        \begin{itemize}
+            \item STL file upload
+            \item Parameter validation
+            \item Job creation
+        \end{itemize}
+    \item \textbf{Mesh Generation}
+        \begin{itemize}
+            \item Mesh voxelization
+            \item Gyroid pattern application
+            \item Marching cubes algorithm
+        \end{itemize}
+    \item \textbf{Output Generation}
+        \begin{itemize}
+            \item Mesh optimization
+            \item STL file export
+            \item Progress reporting
+        \end{itemize}
+\end{enumerate}
+
+\section{Technology Stack Details}
+\subsection{Frontend Technologies}
+\begin{itemize}
+    \item React.js for UI components
+    \item Three.js for 3D graphics
+    \item Material-UI for styling
+    \item Web Workers for performance
+\end{itemize}
+
+\subsection{Backend Technologies}
+\begin{itemize}
+    \item Python FastAPI framework
+    \item NumPy for numerical operations
+    \item Trimesh for mesh processing
+    \item TorchIO for medical imaging
+\end{itemize}
+
+\subsection{Development Tools}
+\begin{itemize}
+    \item Git for version control
+    \item VS Code with LaTeX Workshop
+    \item Node.js development server
+    \item Python virtual environment
+\end{itemize}
+
+\section{System Components}
+\begin{figure}[h]
+\centering
+\begin{tcolorbox}[width=0.8\textwidth]
+\begin{verbatim}
++----------------+     +-----------------+
+|   Frontend     |     |    Backend     |
+|  (React/Vite)  | <-> |   (FastAPI)    |
++----------------+     +-----------------+
+       |                      |
++----------------+     +-----------------+
+|    Three.js    |     |  Mesh Process  |
+|    Replicad    |     |  (NumPy/SciPy) |
++----------------+     +-----------------+
+\end{verbatim}
+\end{tcolorbox}
+\caption{High-level system architecture}
+\end{figure}
+
+\section{Data Flow}
+\begin{enumerate}
+    \item User uploads STL file through frontend interface
+    \item Frontend validates file and sends to backend API
+    \item Backend processes file in chunks:
+    \begin{itemize}
+        \item Initial setup and mesh loading (0-40\%)
+        \item Containment analysis (40-60\%)
+        \item Gyroid pattern generation (60-90\%)
+        \item Final processing and export (90-100\%)
+    \end{itemize}
+    \item Progress updates sent to frontend via polling
+    \item Final mesh returned to frontend for preview/download
+\end{enumerate}
+
+\section{Memory Management}
+\subsection{Chunked Processing}
+The system employs a chunked processing approach to handle large meshes efficiently:
+\begin{itemize}
+    \item Automatic mesh simplification for large inputs
+    \item Memory monitoring and garbage collection
+    \item Efficient numpy array operations
+    \item Progress tracking per processing chunk
+\end{itemize}
+
+\subsection{Resource Limits}
+\begin{itemize}
+    \item Maximum input mesh: 1,000,000 vertices
+    \item Maximum output mesh: 1,000,000 vertices
+    \item Maximum memory usage: 50\% of system RAM
+    \item Maximum resolution: 100
+\end{itemize}
